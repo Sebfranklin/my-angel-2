@@ -430,6 +430,30 @@
       opacity: 0.2;
     }
 
+    /* Keyboard focus state (mirrors hover affordance) */
+    .gallery-card:focus-visible {
+      outline: 2px solid rgba(244, 63, 94, 0.9);
+      outline-offset: 4px;
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(244, 63, 94, 0.45);
+      box-shadow: 0 20px 40px rgba(244, 63, 94, 0.18);
+    }
+
+    /* When ticker is paused (user toggled), cards stay grabbable but with hint */
+    .ticker.paused {
+      cursor: default;
+    }
+    .ticker.paused .gallery-card {
+      transform: translateY(-4px) scale(1.01);
+    }
+
+    /* Respect reduced motion: no auto-scroll, only manual */
+    @media (prefers-reduced-motion: reduce) {
+      .ticker {
+        animation: none !important;
+      }
+    }
+
     .gallery-img {
       width: 100%;
       height: 100%;
@@ -1006,17 +1030,39 @@
       }
     });
 
-    // --- GEM GALLERY: AUTO-SCROLL + INTERACTIVE DRAG ---
+    // --- GEM GALLERY: AUTO-SCROLL + FLEXIBLY INTERACTIVE (v2) ---
+    // Features:
+    //  - Continuous auto-scroll (leftward) with seamless infinite wrap
+    //  - Mouse & touch drag (clicks that don't drag don't toggle pause)
+    //  - Inertia/momentum on drag release and wheel nudges
+    //  - Hover-to-pause (mouse)
+    //  - Click-to-toggle pause (with drag-click suppression)
+    //  - Wheel-to-nudge (vertical wheel translates to horizontal motion)
+    //  - Keyboard nav: arrows, Home/End, Space (pause toggle)
+    //  - Pause when tab hidden, gallery offscreen, or reduced-motion preferred
+    //  - Focus-visible styling for accessibility
     const tickerEl = document.getElementById('galleryTicker');
-    let tickerX = 0;          // current translateX (px)
+    let tickerX = 0;             // current translateX (px)
+    let velocity = 0;            // px/frame, decays via friction after drag/wheel
     let isDragging = false;
+    let isPaused = false;        // user explicitly paused (click toggle / Space)
+    let isHovered = false;       // pointer currently over the ticker
     let dragStartX = 0;
     let dragStartScroll = 0;
+    let dragMoved = false;       // true if pointer moved past threshold during press
     let lastInteractionAt = 0;
+    let lastSample = { x: 0, t: 0 };
 
-    const AUTO_SPEED = 0.6;        // px per ~60fps frame
-    const IDLE_RESUME_MS = 1800;   // ms of idle before auto resumes
-    const DRAG_LOOKAHEAD = 1;      // extra oneSetWidths of slack during drag
+    const AUTO_SPEED = 0.6;            // px per ~60fps frame
+    const IDLE_RESUME_MS = 1800;       // ms of idle before auto resumes
+    const DRAG_CLICK_THRESHOLD = 6;    // px; below this, treat press as click
+    const WHEEL_GAIN = 0.02;           // px/(frame*unit) added per wheel delta
+    const VELOCITY_FRICTION = 0.92;    // multiplier per frame on inertia
+    const VELOCITY_STOP = 0.05;        // below this, inertia -> 0
+    const MAX_VELOCITY = 40;           // clamp to prevent runaway spins
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const autoEnabled = !reducedMotion;
 
     // Populate twice for seamless infinite loop
     const galleryCount = 18;
@@ -1024,11 +1070,14 @@
       for (let i = 1; i <= galleryCount; i++) {
         const card = document.createElement('div');
         card.className = 'gallery-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'group');
+        card.setAttribute('aria-label', `Gallery photo ${i}`);
         const img = document.createElement('img');
         img.className = 'gallery-img';
         img.src = `download/gallery_${i}.webp`;
-        img.alt = "Sonia's Photo";
-        img.loading = "lazy";
+        img.alt = `Sonia's photo ${i}`;
+        img.loading = 'lazy';
         img.draggable = false;
         card.appendChild(img);
         tickerEl.appendChild(card);
@@ -1043,50 +1092,81 @@
       tickerEl.style.transform = `translate3d(${tickerX}px, 0, 0)`;
     }
 
-    // Auto-scroll loop with seamless wrap + drag pause
+    function wrapPosition() {
+      const setW = oneSetWidth();
+      if (setW <= 0) return;
+      while (tickerX <= -setW) tickerX += setW;
+      while (tickerX > 0) tickerX -= setW;
+    }
+
+    // Main loop: priority is drag (manual) > inertia > auto-scroll > idle
     let lastFrame = performance.now();
     function tickerLoop(now) {
       const dt = now - lastFrame;
       lastFrame = now;
+      const idleEnough = (now - lastInteractionAt) > IDLE_RESUME_MS;
 
-      if (!isDragging && (now - lastInteractionAt) > IDLE_RESUME_MS) {
+      if (isDragging) {
+        // Drag updates position directly in onDragMove; nothing to do here.
+      } else if (!isPaused && Math.abs(velocity) > VELOCITY_STOP) {
+        tickerX += velocity * (dt / 16.67);
+        velocity *= VELOCITY_FRICTION;
+        wrapPosition();
+        applyTickerPosition();
+      } else if (
+        autoEnabled &&
+        idleEnough &&
+        !isPaused &&
+        !isHovered &&
+        Math.abs(velocity) <= VELOCITY_STOP
+      ) {
         const setW = oneSetWidth();
         if (setW > 0) {
-          // Move left, normalized to 60fps baseline
           tickerX -= AUTO_SPEED * (dt / 16.67);
-          // Seamless wrap when one full set has scrolled past
-          if (tickerX <= -setW) {
-            tickerX += setW;
-          }
+          wrapPosition();
           applyTickerPosition();
         }
+      } else if (Math.abs(velocity) <= VELOCITY_STOP) {
+        velocity = 0;
       }
+
       requestAnimationFrame(tickerLoop);
     }
 
-    function clampDuringDrag(x) {
-      const setW = oneSetWidth();
-      const minX = -(setW + (setW * DRAG_LOOKAHEAD * 0)); // allow one full extra set of slack
-      const maxX = 0;
-      if (x > maxX) return maxX;
-      if (x < minX) return minX;
-      return x;
+    function clearPause() {
+      if (isPaused) {
+        isPaused = false;
+        tickerEl.classList.remove('paused');
+      }
     }
 
-    function onDragStart(clientX) {
+    function beginDrag(clientX) {
       isDragging = true;
+      velocity = 0;
+      dragMoved = false;
       dragStartX = clientX;
       dragStartScroll = tickerX;
+      lastSample = { x: clientX, t: performance.now() };
       tickerEl.classList.add('dragging');
       lastInteractionAt = performance.now();
+      // Starting a drag is an active motion — clear any user pause
+      clearPause();
     }
-    function onDragMove(clientX) {
+    function moveDrag(clientX) {
       if (!isDragging) return;
-      tickerX = clampDuringDrag(dragStartScroll + (clientX - dragStartX));
+      if (Math.abs(clientX - dragStartX) > DRAG_CLICK_THRESHOLD) dragMoved = true;
+      tickerX = dragStartScroll + (clientX - dragStartX);
+      wrapPosition();
       applyTickerPosition();
-      lastInteractionAt = performance.now();
+      const now = performance.now();
+      const dt = Math.max(1, now - lastSample.t);
+      // px per ~60fps frame from the last sample
+      velocity = ((clientX - lastSample.x) / dt) * 16.67;
+      velocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity));
+      lastSample = { x: clientX, t: now };
+      lastInteractionAt = now;
     }
-    function onDragEnd() {
+    function endDrag() {
       if (!isDragging) return;
       isDragging = false;
       tickerEl.classList.remove('dragging');
@@ -1095,25 +1175,81 @@
 
     // Mouse
     tickerEl.addEventListener('mousedown', (e) => {
-      onDragStart(e.clientX);
+      if (e.button !== 0) return;
+      beginDrag(e.clientX);
       e.preventDefault();
     });
-    window.addEventListener('mousemove', (e) => onDragMove(e.clientX));
-    window.addEventListener('mouseup', onDragEnd);
-    window.addEventListener('mouseleave', onDragEnd);
+    window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('mouseleave', endDrag);
 
     // Touch
     tickerEl.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1) onDragStart(e.touches[0].clientX);
+      if (e.touches.length !== 1) return;
+      beginDrag(e.touches[0].clientX);
     }, { passive: true });
     tickerEl.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 1) onDragMove(e.touches[0].clientX);
+      if (!isDragging || e.touches.length !== 1) return;
+      moveDrag(e.touches[0].clientX);
     }, { passive: true });
-    tickerEl.addEventListener('touchend', onDragEnd);
-    tickerEl.addEventListener('touchcancel', onDragEnd);
+    tickerEl.addEventListener('touchend', endDrag);
+    tickerEl.addEventListener('touchcancel', endDrag);
+
+    // Hover-to-pause (mouse only — touch lacks reliable hover)
+    tickerEl.addEventListener('mouseenter', () => {
+      isHovered = true;
+      lastInteractionAt = performance.now();
+    });
+    tickerEl.addEventListener('mouseleave', () => {
+      isHovered = false;
+      lastInteractionAt = performance.now();
+    });
+
+    // Click-to-toggle pause (suppressed if the press was actually a drag)
+    tickerEl.addEventListener('click', (e) => {
+      if (dragMoved) return;
+      isPaused = !isPaused;
+      tickerEl.classList.toggle('paused', isPaused);
+      lastInteractionAt = performance.now();
+    });
+
+    // Wheel-to-nudge: vertical wheel feeds horizontal velocity with momentum
+    tickerEl.addEventListener('wheel', (e) => {
+      const delta = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY);
+      velocity += -delta * WHEEL_GAIN;
+      velocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity));
+      lastInteractionAt = performance.now();
+      e.preventDefault();
+    }, { passive: false });
+
+    // Keyboard navigation on focused card
+    tickerEl.addEventListener('keydown', (e) => {
+      const setW = oneSetWidth();
+      const card = tickerEl.querySelector('.gallery-card');
+      const cardWidth = card ? card.getBoundingClientRect().width : 240;
+      const step = cardWidth + 32; // card + 2 * horizontal margin
+      const reset = () => { velocity = 0; lastInteractionAt = performance.now(); };
+      switch (e.key) {
+        case 'ArrowRight':
+          tickerX -= step; wrapPosition(); applyTickerPosition(); reset(); e.preventDefault(); break;
+        case 'ArrowLeft':
+          tickerX += step; wrapPosition(); applyTickerPosition(); reset(); e.preventDefault(); break;
+        case 'Home':
+          tickerX = 0; wrapPosition(); applyTickerPosition(); reset(); e.preventDefault(); break;
+        case 'End':
+          tickerX = -setW; wrapPosition(); applyTickerPosition(); reset(); e.preventDefault(); break;
+        case ' ':
+        case 'Spacebar':
+          isPaused = !isPaused;
+          tickerEl.classList.toggle('paused', isPaused);
+          lastInteractionAt = performance.now();
+          e.preventDefault();
+          break;
+      }
+    });
 
     // Prevent native image drag from interfering
-    tickerEl.querySelectorAll('img').forEach(img => {
+    tickerEl.querySelectorAll('img').forEach((img) => {
       img.addEventListener('dragstart', (e) => e.preventDefault());
     });
 
@@ -1132,6 +1268,16 @@
       }, { threshold: 0.01 });
       io.observe(gallerySection);
     }
+
+    // Pause when tab is hidden; reset clock on return so motion resumes cleanly
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        lastInteractionAt = performance.now() + 1e9;
+      } else {
+        lastFrame = performance.now();
+        lastInteractionAt = 0;
+      }
+    });
 
     // Kick off the auto-scroll loop
     requestAnimationFrame((t) => {
