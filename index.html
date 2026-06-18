@@ -331,10 +331,12 @@
       line-height: 1;
     }
 
-    /* Acronym keywords inside intro paragraph - match big card letter color */
+    /* Acronym keywords inside intro paragraph - match big card letter color & font */
     .acronym-keyword {
       color: var(--accent-gold);
-      font-weight: 500;
+      font-family: 'Cinzel Decorative', cursive;
+      font-weight: 700;
+      letter-spacing: 0.04em;
       text-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
     }
 
@@ -582,7 +584,7 @@
           <div class="panel-intro" id="acronymIntro">
             <h2 class="panel-title">With Her...</h2>
             <p class="story-text">
-              With her <span class="acronym-keyword">smart</span> mind and <span class="acronym-keyword">outstanding</span> personality, her <span class="acronym-keyword">natural</span> charm makes her truly <span class="acronym-keyword">irresistible</span> and <span class="acronym-keyword">angelic</span>.
+              With her <span class="acronym-keyword">Smart</span> mind and <span class="acronym-keyword">Outstanding</span> personality, her <span class="acronym-keyword">Natural</span> charm makes her truly <span class="acronym-keyword">Irresistible</span> and <span class="acronym-keyword">Angelic</span>.
             </p>
           </div>
         </section>
@@ -1004,107 +1006,137 @@
       }
     });
 
-    // --- GEM GALLERY: INTERACTIVE DRAG SCROLL ---
+    // --- GEM GALLERY: AUTO-SCROLL + INTERACTIVE DRAG ---
     const tickerEl = document.getElementById('galleryTicker');
-    let tickerX = 0;          // current translateX
-    let tickerMinX = 0;       // furthest left we can scroll
+    let tickerX = 0;          // current translateX (px)
     let isDragging = false;
     let dragStartX = 0;
     let dragStartScroll = 0;
-    let dragMoved = false;
+    let lastInteractionAt = 0;
 
-    // Populate cards (single set; user drags to scroll)
+    const AUTO_SPEED = 0.6;        // px per ~60fps frame
+    const IDLE_RESUME_MS = 1800;   // ms of idle before auto resumes
+    const DRAG_LOOKAHEAD = 1;      // extra oneSetWidths of slack during drag
+
+    // Populate twice for seamless infinite loop
     const galleryCount = 18;
-    for (let i = 1; i <= galleryCount; i++) {
-      const card = document.createElement('div');
-      card.className = 'gallery-card';
-      const img = document.createElement('img');
-      img.className = 'gallery-img';
-      img.src = `download/gallery_${i}.webp`;
-      img.alt = "Sonia's Photo";
-      img.loading = "lazy";
-      img.draggable = false;
-      card.appendChild(img);
-      tickerEl.appendChild(card);
+    for (let loop = 0; loop < 2; loop++) {
+      for (let i = 1; i <= galleryCount; i++) {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+        const img = document.createElement('img');
+        img.className = 'gallery-img';
+        img.src = `download/gallery_${i}.webp`;
+        img.alt = "Sonia's Photo";
+        img.loading = "lazy";
+        img.draggable = false;
+        card.appendChild(img);
+        tickerEl.appendChild(card);
+      }
     }
 
-    function updateTickerBounds() {
-      tickerMinX = -(tickerEl.scrollWidth - tickerEl.parentElement.clientWidth);
-      // clamp
-      if (tickerX > 0) tickerX = 0;
-      if (tickerX < tickerMinX) tickerX = tickerMinX;
-      gsap.set(tickerEl, { x: tickerX });
+    function oneSetWidth() {
+      return tickerEl.scrollWidth / 2;
     }
 
     function applyTickerPosition() {
       tickerEl.style.transform = `translate3d(${tickerX}px, 0, 0)`;
     }
 
-    function clampTickerX(x) {
-      if (x > 0) return 0;
-      if (x < tickerMinX) return tickerMinX;
+    // Auto-scroll loop with seamless wrap + drag pause
+    let lastFrame = performance.now();
+    function tickerLoop(now) {
+      const dt = now - lastFrame;
+      lastFrame = now;
+
+      if (!isDragging && (now - lastInteractionAt) > IDLE_RESUME_MS) {
+        const setW = oneSetWidth();
+        if (setW > 0) {
+          // Move left, normalized to 60fps baseline
+          tickerX -= AUTO_SPEED * (dt / 16.67);
+          // Seamless wrap when one full set has scrolled past
+          if (tickerX <= -setW) {
+            tickerX += setW;
+          }
+          applyTickerPosition();
+        }
+      }
+      requestAnimationFrame(tickerLoop);
+    }
+
+    function clampDuringDrag(x) {
+      const setW = oneSetWidth();
+      const minX = -(setW + (setW * DRAG_LOOKAHEAD * 0)); // allow one full extra set of slack
+      const maxX = 0;
+      if (x > maxX) return maxX;
+      if (x < minX) return minX;
       return x;
     }
 
-    // Mouse drag
-    tickerEl.addEventListener('mousedown', (e) => {
+    function onDragStart(clientX) {
       isDragging = true;
-      dragMoved = false;
-      dragStartX = e.clientX;
+      dragStartX = clientX;
       dragStartScroll = tickerX;
       tickerEl.classList.add('dragging');
-      e.preventDefault();
-    });
-
-    window.addEventListener('mousemove', (e) => {
+      lastInteractionAt = performance.now();
+    }
+    function onDragMove(clientX) {
       if (!isDragging) return;
-      const dx = e.clientX - dragStartX;
-      if (Math.abs(dx) > 3) dragMoved = true;
-      tickerX = clampTickerX(dragStartScroll + dx);
+      tickerX = clampDuringDrag(dragStartScroll + (clientX - dragStartX));
       applyTickerPosition();
-    });
-
-    window.addEventListener('mouseup', () => {
+      lastInteractionAt = performance.now();
+    }
+    function onDragEnd() {
       if (!isDragging) return;
       isDragging = false;
       tickerEl.classList.remove('dragging');
-    });
+      lastInteractionAt = performance.now();
+    }
 
-    // Touch drag
+    // Mouse
+    tickerEl.addEventListener('mousedown', (e) => {
+      onDragStart(e.clientX);
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => onDragMove(e.clientX));
+    window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('mouseleave', onDragEnd);
+
+    // Touch
     tickerEl.addEventListener('touchstart', (e) => {
-      isDragging = true;
-      dragMoved = false;
-      dragStartX = e.touches[0].clientX;
-      dragStartScroll = tickerX;
+      if (e.touches.length === 1) onDragStart(e.touches[0].clientX);
     }, { passive: true });
-
     tickerEl.addEventListener('touchmove', (e) => {
-      if (!isDragging) return;
-      const dx = e.touches[0].clientX - dragStartX;
-      if (Math.abs(dx) > 3) dragMoved = true;
-      tickerX = clampTickerX(dragStartScroll + dx);
-      applyTickerPosition();
+      if (e.touches.length === 1) onDragMove(e.touches[0].clientX);
     }, { passive: true });
-
-    tickerEl.addEventListener('touchend', () => {
-      isDragging = false;
-    });
+    tickerEl.addEventListener('touchend', onDragEnd);
+    tickerEl.addEventListener('touchcancel', onDragEnd);
 
     // Prevent native image drag from interfering
     tickerEl.querySelectorAll('img').forEach(img => {
       img.addEventListener('dragstart', (e) => e.preventDefault());
     });
 
-    // Recalculate bounds on resize (after layout settles)
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(updateTickerBounds, 100);
-    });
+    // Pause auto-scroll when the gallery is offscreen (saves CPU)
+    const gallerySection = document.getElementById('gallerySection');
+    if (gallerySection) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            lastFrame = performance.now();
+            lastInteractionAt = 0; // resume immediately when visible
+          } else {
+            lastInteractionAt = performance.now() + 1e9; // pause
+          }
+        });
+      }, { threshold: 0.01 });
+      io.observe(gallerySection);
+    }
 
-    // Initial layout after images declare width
-    requestAnimationFrame(() => {
-      requestAnimationFrame(updateTickerBounds);
+    // Kick off the auto-scroll loop
+    requestAnimationFrame((t) => {
+      lastFrame = t;
+      requestAnimationFrame(tickerLoop);
     });
 
     // Hide scroll indicator on scroll
