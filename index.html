@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>For Sonia - My Rare Gem</title>
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Outfit:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+  
+  <!-- GSAP & ScrollTrigger CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <style>
+    /* -------------------------------------------------------------
+       DESIGN SYSTEM & BULLETPROOF LAYOUTS
+       ------------------------------------------------------------- */
+    :root {
+      --bg-dark: #020617;
+      --text-light: #f8fafc;
+      --text-muted: #cbd5e1;
+      --primary-glow: rgba(244, 63, 94, 0.4);
+      --secondary-glow: rgba(99, 102, 241, 0.4);
+      --accent-gold: #fbbf24;
+      --accent-rose: #fda4af;
+      --font-heading: 'Playfair Display', serif;
+      --font-sans: 'Outfit', sans-serif;
+      --container-padding: 1.25rem;
+    }
+
+    /* Reset & Base Styles - Locking Horizontal Scroll globally */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    html {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background-color: var(--bg-dark);
+    }
+
+    /* Make body transparent so fixed canvas behind is visible globally */
+    body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background-color: transparent;
+      color: var(--text-light);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+
+    /* Global container to isolate all sections from horizontal bleeding */
+    .story-container {
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient Space Background Canvas */
+    #space-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, #030712 0%, #020617 100%);
+    }
+
+    /* Scroll Indicator (Fades out when scrolling) */
+    .scroll-indicator {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.8rem;
+      font-weight: 300;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      z-index: 10;
+      pointer-events: none;
+      animation: bounce 2s infinite;
+      opacity: 0.8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    
+    .scroll-indicator::after {
+      content: '';
+      width: 1px;
+      height: 25px;
+      background-color: var(--accent-rose);
+      display: block;
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translate(-50%, 0); }
+      40% { transform: translate(-50%, -8px); }
+      60% { transform: translate(-50%, -4px); }
+    }
+
+    /* Floating sections (NO CARDS - float directly on background) */
+    .story-section {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: var(--container-padding);
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      background: transparent; /* Ensure stars show through */
+    }
+
+    .story-content {
+      width: 100%;
+      max-width: 750px;
+      text-align: center;
+      margin: 0 auto;
+    }
+
+    .story-text {
+      font-family: var(--font-heading);
+      font-weight: 300;
+      color: var(--text-muted);
+      font-size: clamp(1.25rem, 3vw + 0.9rem, 1.85rem);
+      line-height: 1.7;
+      text-shadow: 0 4px 15px rgba(0, 0, 0, 0.95);
+    }
+
+    /* Word level split wrappers (prevents word breaking/concatenation) */
+    .word-wrapper {
+      display: inline-block;
+      white-space: nowrap;
+      margin: 0 0.18em;
+    }
+
+    /* Opening Quote styling */
+    .quote-text {
+      font-family: var(--font-heading);
+      font-style: italic;
+      color: #ffe4e6;
+      font-size: clamp(1.4rem, 4vw + 1rem, 2.3rem);
+      line-height: 1.5;
+    }
+
+    .quote-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: clamp(200px, 40vw, 350px);
+      height: clamp(200px, 40vw, 350px);
+      background: radial-gradient(circle, rgba(244, 63, 94, 0.12) 0%, rgba(99, 102, 241, 0.04) 60%, transparent 100%);
+      filter: blur(40px);
+      z-index: -1;
+      border-radius: 50%;
+    }
+
+    /* Constellation effect letters */
+    .constellation-letter {
+      display: inline-block;
+      opacity: 0;
+      transform: translate(var(--x, 0px), var(--y, 0px)) rotate(var(--r, 0deg));
+    }
+
+    /* 3. Glow Burst background light */
+    .glow-burst-bg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 150px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      pointer-events: none;
+      z-index: -1;
+      transform-origin: center;
+      scale: 0 1;
+    }
+
+    /* 5. Expanding pulse word style */
+    .pulse-word {
+      display: inline-block;
+      transform-origin: center;
+    }
+
+    /* 6. Floating state of desire words */
+    .floating-word {
+      display: inline-block;
+      animation: floatSway 4s ease-in-out infinite alternate;
+      animation-delay: calc(var(--i) * 0.15s);
+    }
+    @keyframes floatSway {
+      0% { transform: translateY(0px) rotate(0deg); }
+      100% { transform: translateY(-10px) rotate(1.5deg); }
+    }
+
+    /* 8. Wisdom golden sweep text */
+    .golden-sweep-text {
+      background: linear-gradient(to right, var(--text-muted) 20%, var(--accent-gold) 40%, var(--accent-gold) 60%, var(--text-muted) 80%);
+      background-size: 200% auto;
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    /* -------------------------------------------------------------
+       HORIZONTAL PINNED ACRONYM SECTION
+       ------------------------------------------------------------- */
+    .horizontal-outer {
+      width: 100vw;
+      max-width: 100vw;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .horizontal-inner {
+      display: flex;
+      width: 600vw; /* Intro + S-O-N-I-A */
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .panel {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
+      padding: var(--container-padding);
+      position: relative;
+      overflow: hidden;
+      background: transparent; /* Keep background visible */
+    }
+
+    .panel-intro {
+      text-align: center;
+      max-width: 650px;
+      width: 100%;
+    }
+
+    .panel-title {
+      font-family: 'Cinzel Decorative', cursive;
+      font-size: clamp(2.2rem, 6vw + 1rem, 3.8rem);
+      color: var(--accent-rose);
+      margin-bottom: 1.5rem;
+      text-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+    }
+
+    /* Cards styled as image-focused layouts with text overlays */
+    .acronym-card {
+      position: relative;
+      width: 90%;
+      max-width: 380px;
+      height: clamp(430px, 70vh, 520px);
+      border-radius: 24px;
+      border: 1.5px solid rgba(251, 191, 36, 0.25);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.95);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .acronym-card-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .acronym-card:hover .acronym-card-bg {
+      transform: scale(1.06);
+    }
+
+    .acronym-card-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, rgba(2, 6, 23, 0.15) 0%, rgba(2, 6, 23, 0.5) 45%, rgba(2, 6, 23, 0.92) 100%);
+      z-index: 2;
+    }
+
+    .acronym-content {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      padding: 1.8rem;
+      text-align: left;
+    }
+
+    .acronym-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-start;
+      gap: 0.6rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .acronym-letter {
+      font-family: 'Cinzel Decorative', cursive;
+      font-size: clamp(3.2rem, 8vw, 4.5rem);
+      font-weight: 700;
+      color: var(--accent-gold);
+      text-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+      line-height: 1;
+    }
+
+    .acronym-word {
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      font-weight: 500;
+      color: var(--text-light);
+      font-family: var(--font-heading);
+    }
+
+    .acronym-desc {
+      font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+      color: #e2e8f0; /* brighter for overlay visibility */
+      line-height: 1.5;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* -------------------------------------------------------------
+       EPILOGUE & CHOICE SECTION
+       ------------------------------------------------------------- */
+    .epilogue-section {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem var(--container-padding);
+      text-align: center;
+      background: transparent;
+    }
+
+    .epilogue-text-wrap {
+      max-width: 650px;
+      margin-bottom: 3rem;
+    }
+
+    .epilogue-paragraph {
+      margin-bottom: 2rem;
+    }
+
+    .choices-card-wrap {
+      width: 100%;
+      max-width: 600px;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 24px;
+      padding: 2rem 1.5rem;
+      border: 1px solid rgba(244, 63, 94, 0.15);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 45px rgba(0,0,0,0.8);
+    }
+
+    .question-title {
+      font-size: clamp(1.2rem, 3.5vw + 0.5rem, 1.7rem);
+      font-family: var(--font-heading);
+      font-weight: 400;
+      color: var(--text-light);
+      margin-bottom: 2rem;
+      line-height: 1.4;
+    }
+
+    .choices-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.8rem;
+    }
+
+    .choice-btn {
+      background: rgba(30, 41, 59, 0.45);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+      color: var(--text-light);
+      padding: 1rem;
+      font-size: 1rem;
+      font-family: var(--font-sans);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .choice-btn:hover {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+      border-color: #f43f5e;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(244, 63, 94, 0.3);
+    }
+
+    .choice-btn:focus-visible {
+      outline: 2px solid var(--accent-gold);
+      outline-offset: 4px;
+    }
+
+    .choice-btn:active {
+      transform: scale(0.97) translateY(0);
+      background: rgba(244, 63, 94, 0.35);
+    }
+
+    /* Final Message Overlay */
+    .final-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 6, 23, 0.96);
+      backdrop-filter: blur(20px);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s ease;
+      padding: 2rem;
+    }
+
+    .final-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .final-content {
+      max-width: 600px;
+      text-align: center;
+      transform: scale(0.92);
+      transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .final-overlay.active .final-content {
+      transform: scale(1);
+    }
+
+    .final-heart {
+      font-size: clamp(3rem, 8vw, 4.5rem);
+      color: #f43f5e;
+      margin-bottom: 1.5rem;
+      animation: heartbeat 1.5s infinite;
+      filter: drop-shadow(0 0 10px rgba(244, 63, 94, 0.5));
+    }
+
+    @keyframes heartbeat {
+      0%, 40%, 80%, 100% { transform: scale(1); }
+      20%, 60% { transform: scale(1.12); }
+    }
+
+    .final-message {
+      font-family: var(--font-heading);
+      font-size: clamp(1.15rem, 3vw + 0.6rem, 1.6rem);
+      line-height: 1.7;
+      color: #ffe4e6;
+      margin-bottom: 2.5rem;
+      white-space: pre-line;
+    }
+
+    .close-overlay-btn {
+      background: transparent;
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      color: var(--accent-rose);
+      padding: 0.8rem 1.8rem;
+      border-radius: 50px;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: all 0.3s ease;
+    }
+
+    .close-overlay-btn:hover {
+      background: #f43f5e;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+    }
+
+    .close-overlay-btn:focus-visible {
+      outline: 2px solid var(--accent-gold);
+      outline-offset: 4px;
+    }
+
+    .close-overlay-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* -------------------------------------------------------------
+       GEM GALLERY ENDLESS ROTATING CAROUSEL
+       ------------------------------------------------------------- */
+    .gallery-section {
+      width: 100%;
+      padding: 5rem 0;
+      position: relative;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .gallery-title {
+      text-align: center;
+      font-family: 'Cinzel Decorative', cursive;
+      font-size: clamp(1.8rem, 5vw, 2.5rem);
+      color: var(--accent-rose);
+      margin-bottom: 3rem;
+      letter-spacing: 0.05em;
+    }
+
+    .ticker-wrap {
+      width: 100%;
+      overflow: hidden;
+      padding: 1rem 0;
+    }
+
+    .ticker {
+      display: flex;
+      width: max-content;
+      animation: ticker-anim 45s linear infinite;
+    }
+
+    .ticker:hover {
+      animation-play-state: paused;
+    }
+
+    .gallery-card {
+      width: clamp(200px, 45vw, 260px);
+      height: clamp(280px, 60vw, 360px);
+      margin: 0 1rem;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .gallery-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, transparent 65%, rgba(2, 6, 23, 0.8));
+      opacity: 0.5;
+      transition: opacity 0.3s ease;
+    }
+
+    .gallery-card:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(244, 63, 94, 0.35);
+      box-shadow: 0 20px 40px rgba(244, 63, 94, 0.15);
+    }
+
+    .gallery-card:hover::after {
+      opacity: 0.2;
+    }
+
+    .gallery-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    @keyframes ticker-anim {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-50%, 0, 0); }
+    }
+
+    /* -------------------------------------------------------------
+       MEDIA ENHANCEMENTS FOR DESKTOP (768px & up)
+       ------------------------------------------------------------- */
+    @media (min-width: 768px) {
+      :root {
+        --container-padding: 3rem;
+      }
+
+      /* Desktop layout sizing for the vertical acronym overlay card */
+      .acronym-card {
+        max-width: 440px;
+        height: 580px;
+      }
+
+      .acronym-image-container {
+        flex: 1.1;
+        height: 440px;
+        border-radius: 20px;
+      }
+
+      .acronym-content {
+        flex: 1;
+        text-align: left;
+        justify-content: center;
+      }
+
+      .acronym-header {
+        justify-content: flex-start;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+      }
+
+      .acronym-letter {
+        font-size: 5.5rem;
+      }
+
+      .acronym-word {
+        font-size: 2.8rem;
+      }
+
+      .acronym-desc {
+        font-size: 1.15rem;
+      }
+
+      /* Choice Buttons layout: 2-column grid */
+      .choices-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.2rem;
+      }
+
+      .choices-card-wrap {
+        padding: 3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Space Canvas -->
+  <canvas id="space-canvas"></canvas>
+
+  <!-- Navigation indicator -->
+  <div class="scroll-indicator" id="scrollIndicator">Scroll Journey</div>
+
+  <div class="story-container">
+    
+    <!-- 1. Opening Quote -->
+    <section class="story-section" id="sec-1">
+      <div class="story-content">
+        <div class="quote-glow"></div>
+        <p class="quote-text" id="quoteText">
+          "My eyes are specially made to identify the potential embedded within you, and my heart is uniquely made to love you."
+        </p>
+      </div>
+    </section>
+
+    <!-- 2. Constellation Assemble -->
+    <section class="story-section" id="sec-2">
+      <div class="story-content">
+        <p class="story-text" id="constellationText">
+          On March 22, 2007, a very unique creature entered the earth, packed with a lot of potential within... This unique creature turned out to be a lady whose name is <span style="color: #ec4899; font-weight: 500; text-shadow: 0 0 12px rgba(236, 72, 153, 0.6);">SONIA</span>.
+        </p>
+      </div>
+    </section>
+
+    <!-- 3. Glow Burst -->
+    <section class="story-section" id="sec-3">
+      <div class="story-content" style="position: relative;">
+        <div class="glow-burst-bg" id="glowOverlay"></div>
+        <p class="story-text" id="glowText">
+          Nobody actually could see this hidden gem because she was so unique that she blinded people from seeing, just like a bright light can blind.
+        </p>
+      </div>
+    </section>
+
+    <!-- 4. 3D Deep Space Focus -->
+    <section class="story-section" id="sec-4">
+      <div class="story-content">
+        <p class="story-text" id="focusText">
+          But one day, there was a guy who was also born just about a year before the appearance of this gem, and his name is <span style="color: #22c55e; font-weight: 500; text-shadow: 0 0 12px rgba(34, 197, 94, 0.5);">Sebastian Franklin</span>. He was created with specific eye layers to be able to spot all the hidden potentials in this very unique gem, but at first, he didn't know...
+        </p>
+      </div>
+    </section>
+
+    <!-- 5. Rejoicing Pulse -->
+    <section class="story-section" id="sec-5">
+      <div class="story-content">
+        <p class="story-text" id="pulseText">
+          But the day he discovered it, his heart was filled to the brim with gladness and his soul rejoiced. He knew he had found a gem that is one in a trillion, rarer than the rarest mineral.
+        </p>
+      </div>
+    </section>
+
+    <!-- 6. Floating State of Desire -->
+    <section class="story-section" id="sec-6">
+      <div class="story-content">
+        <p class="story-text" id="floatText">
+          He decided to take a shot at this gem. Although it wasn't quite smooth, and she didn't say yes, neither did she say no at first, she had this aura that kept him in a constant state of desire.
+        </p>
+      </div>
+    </section>
+
+    <!-- 7. Pushing & Proving -->
+    <section class="story-section" id="sec-7">
+      <div class="story-content">
+        <p class="story-text" id="pushText">
+          He kept pushing forward, loving her and proving his love for the gem.
+        </p>
+      </div>
+    </section>
+
+    <!-- 8. Discovering Reasons -->
+    <section class="story-section" id="sec-8">
+      <div class="story-content">
+        <p class="story-text" id="reasonText">
+          There are some reasons why he loves her, and one of them is in her name—reasons he is only just discovering.
+        </p>
+      </div>
+    </section>
+
+    <!-- 9. Wisdom Golden Sweep -->
+    <section class="story-section" id="sec-9">
+      <div class="story-content">
+        <p class="story-text golden-sweep-text" id="sweepText">
+          Her name, Sonia, means wisdom. He was addicted to asking God for wisdom; little did he know it would come in the form of a beautiful damsel. He strives for knowledge, and that is what wisdom is made of.
+        </p>
+      </div>
+    </section>
+
+    <!-- HORIZONTAL PINNED ACRONYM BLOCK -->
+    <div class="horizontal-outer" id="acronymTrigger">
+      <div class="horizontal-inner" id="horizontalContainer">
+        
+        <!-- Acronym Intro Panel -->
+        <section class="panel">
+          <div class="panel-intro" id="acronymIntro">
+            <h2 class="panel-title">With Her...</h2>
+            <p class="story-text">
+              With her smart mind and outstanding personality, her natural charm makes her truly irresistible and angelic.
+            </p>
+          </div>
+        </section>
+
+        <!-- S Panel -->
+        <section class="panel">
+          <div class="acronym-card">
+            <img src="download/1.webp" alt="Sonia - Smart" class="acronym-card-bg">
+            <div class="acronym-card-overlay"></div>
+            <div class="acronym-content">
+              <div class="acronym-header">
+                <span class="acronym-letter">S</span>
+                <h3 class="acronym-word">Smart</h3>
+              </div>
+              <p class="acronym-desc">With a brilliant mind that guides actions with clarity, sharp intuition, and outstanding wisdom. An intellect that stands out in any crowd.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- O Panel -->
+        <section class="panel">
+          <div class="acronym-card">
+            <img src="download/2.webp" alt="Sonia - Outstanding" class="acronym-card-bg">
+            <div class="acronym-card-overlay"></div>
+            <div class="acronym-content">
+              <div class="acronym-header">
+                <span class="acronym-letter">O</span>
+                <h3 class="acronym-word">Outstanding</h3>
+              </div>
+              <p class="acronym-desc">A beautiful character and presence that rises above the ordinary, radiating grace and drawing admiration naturally.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- N Panel -->
+        <section class="panel">
+          <div class="acronym-card">
+            <img src="download/3.webp" alt="Sonia - Natural" class="acronym-card-bg">
+            <div class="acronym-card-overlay"></div>
+            <div class="acronym-content">
+              <div class="acronym-header">
+                <span class="acronym-letter">N</span>
+                <h3 class="acronym-word">Natural</h3>
+              </div>
+              <p class="acronym-desc">No pretense, no masks. A pure, effortless charm and down-to-earth authenticity that makes every conversation warm and genuine.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- I Panel -->
+        <section class="panel">
+          <div class="acronym-card">
+            <img src="download/4.webp" alt="Sonia - Irresistible" class="acronym-card-bg">
+            <div class="acronym-card-overlay"></div>
+            <div class="acronym-content">
+              <div class="acronym-header">
+                <span class="acronym-letter">I</span>
+                <h3 class="acronym-word">Irresistible</h3>
+              </div>
+              <p class="acronym-desc">A magnetic pull that keeps the heart constantly longing, filled with sweet allure and unforgettable charisma.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- A Panel -->
+        <section class="panel">
+          <div class="acronym-card">
+            <img src="download/5.webp" alt="Sonia - Angelic" class="acronym-card-bg">
+            <div class="acronym-card-overlay"></div>
+            <div class="acronym-content">
+              <div class="acronym-header">
+                <span class="acronym-letter">A</span>
+                <h3 class="acronym-word">Angelic</h3>
+              </div>
+              <p class="acronym-desc">Reflecting a divine beauty that feels celestial, a gentle spirit that brings peace and light to those around her.</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- POST-ACRONYM EPILOGUE & DYNAMIC CHOICES -->
+    <section class="story-section epilogue-section" id="postAcronym">
+      <div class="story-content epilogue-text-wrap" id="epilogueText">
+        <p class="story-text epilogue-paragraph">He adores her in his heart, with his words, and through his actions. To him, she is like a rose with a unique fragrance that is new every day.</p>
+        <p class="story-text epilogue-paragraph">The sun touching her skin reflects the beauty God has put in her. He has found this gem, and he wouldn't let go of her for anything...</p>
+      </div>
+
+      <div class="choices-card-wrap" id="questionCard">
+        <h3 class="question-title">What is your mindset towards Sebastian Franklin?</h3>
+        <div class="choices-grid">
+          <button class="choice-btn" data-choice="I love him">I love him</button>
+          <button class="choice-btn" data-choice="I like him">I like him</button>
+          <button class="choice-btn" data-choice="I really love him">I really love him</button>
+          <button class="choice-btn" data-choice="Crazy in love">Crazy in love</button>
+          <button class="choice-btn" data-choice="Not in love">Not in love</button>
+          <button class="choice-btn" data-choice="Not sure">Not sure</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- GEM GALLERY -->
+    <section class="gallery-section" id="gallerySection">
+      <h2 class="gallery-title">The Gem Gallery</h2>
+      <div class="ticker-wrap">
+        <div class="ticker" id="galleryTicker">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Interactive final overlay -->
+  <div class="final-overlay" id="finalOverlay">
+    <div class="final-content">
+      <div class="final-heart">♥</div>
+      <div class="final-message" id="finalMsg"></div>
+      <button class="close-overlay-btn" id="closeOverlay">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // Register GSAP ScrollTrigger
+    gsap.registerPlugin(ScrollTrigger);
+
+    // List of clean gallery filenames
+    const galleryCount = 18;
+    const ticker = document.getElementById('galleryTicker');
+    
+    // We populate the carousel twice for a seamless infinite loop
+    for (let loop = 0; loop < 2; loop++) {
+      for (let i = 1; i <= galleryCount; i++) {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+        const img = document.createElement('img');
+        img.className = 'gallery-img';
+        img.src = `download/gallery_${i}.webp`;
+        img.alt = "Sonia's Photo";
+        img.loading = "lazy";
+        card.appendChild(img);
+        ticker.appendChild(card);
+      }
+    }
+
+    // SPACE CANVAS DRAWING & ANIMATION
+    const canvas = document.getElementById('space-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let stars = [];
+    let shootingStars = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initStars();
+    }
+
+    function initStars() {
+      stars = [];
+      const numStars = Math.floor((canvas.width * canvas.height) / 7500);
+      for (let i = 0; i < numStars; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 1.5,
+          alpha: Math.random(),
+          speed: 0.006 + Math.random() * 0.012
+        });
+      }
+    }
+
+    function spawnShootingStar() {
+      if (Math.random() < 0.018 && shootingStars.length < 5) {
+        shootingStars.push({
+          x: Math.random() * canvas.width,
+          y: 0,
+          dx: (1.5 + Math.random() * 3.5),
+          dy: (3.5 + Math.random() * 6.5),
+          length: 70 + Math.random() * 110,
+          alpha: 1,
+          decay: 0.012 + Math.random() * 0.018
+        });
+      }
+    }
+
+    function drawSpace() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Stars
+      stars.forEach(star => {
+        star.alpha += star.speed;
+        if (star.alpha > 1 || star.alpha < 0) {
+          star.speed = -star.speed;
+        }
+        ctx.fillStyle = `rgba(248, 250, 252, ${star.alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Shooting stars
+      spawnShootingStar();
+      shootingStars.forEach((star, index) => {
+        ctx.strokeStyle = `rgba(253, 164, 175, ${star.alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(star.x, star.y);
+        ctx.lineTo(star.x - star.length * (star.dx / star.dy), star.y - star.length);
+        ctx.stroke();
+
+        star.x += star.dx;
+        star.y += star.dy;
+        star.alpha -= star.decay;
+
+        if (star.alpha <= 0 || star.y > canvas.height || star.x > canvas.width) {
+          shootingStars.splice(index, 1);
+        }
+      });
+
+      requestAnimationFrame(drawSpace);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    drawSpace();
+
+    // Trigger full screen meteor shower
+    function triggerMeteorShower() {
+      for (let i = 0; i < 20; i++) {
+        setTimeout(() => {
+          shootingStars.push({
+            x: Math.random() * canvas.width * 0.9,
+            y: 0,
+            dx: (2 + Math.random() * 5),
+            dy: (4.5 + Math.random() * 8),
+            length: 110 + Math.random() * 140,
+            alpha: 1,
+            decay: 0.008 + Math.random() * 0.016
+          });
+        }, i * 120);
+      }
+    }
+
+    // --- TEXT SPLITTING HELPER (Avoids Word Concatenation/Breaking) ---
+    function splitTextToWords(elementId) {
+      const el = document.getElementById(elementId);
+      const originalText = el.textContent.trim();
+      el.innerHTML = "";
+      
+      const words = originalText.split(/\s+/);
+      words.forEach((word) => {
+        const wordSpan = document.createElement("span");
+        wordSpan.className = "word-wrapper";
+        
+        // Wrap characters in inner letter spans
+        word.split("").forEach((char) => {
+          const charSpan = document.createElement("span");
+          charSpan.className = "constellation-letter";
+          charSpan.textContent = char;
+          
+          // Random starting coordinates for constellation scattering
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 250 + Math.random() * 350;
+          charSpan.style.setProperty('--x', `${Math.cos(angle) * distance}px`);
+          charSpan.style.setProperty('--y', `${Math.sin(angle) * distance}px`);
+          charSpan.style.setProperty('--r', `${-75 + Math.random() * 150}deg`);
+          
+          wordSpan.appendChild(charSpan);
+        });
+        
+        el.appendChild(wordSpan);
+        el.appendChild(document.createTextNode(" ")); // Insert clean spaces to prevent word concatenation
+      });
+    }
+
+    // --- GSAP MOBILE-FIRST CHOREOGRAPHY ---
+
+    // 1. Opening Quote - Nebula Glow Reveal
+    gsap.fromTo("#quoteText", 
+      { opacity: 0, scale: 0.92, filter: "blur(12px)" },
+      { 
+        opacity: 1, scale: 1, filter: "blur(0px)", duration: 2, ease: "power2.out",
+        scrollTrigger: {
+          trigger: "#sec-1",
+          start: "top 60%",
+          end: "bottom 30%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // 2. Constellation Letter Assemble (Only applied to paragraph 2)
+    splitTextToWords("constellationText");
+    gsap.to("#constellationText .constellation-letter", {
+      opacity: 1,
+      x: 0,
+      y: 0,
+      rotate: 0,
+      duration: 1.4,
+      stagger: 0.008,
+      ease: "power3.out",
+      scrollTrigger: {
+        trigger: "#sec-2",
+        start: "top 55%",
+        toggleActions: "play none none none" // Lock in place once assembled to prevent letters from floating away
+      }
+    });
+
+    // 3. Glow Burst Reveal
+    gsap.fromTo("#glowText", 
+      { opacity: 0, y: 35 },
+      { 
+        opacity: 1, y: 0, duration: 1.2,
+        scrollTrigger: {
+          trigger: "#sec-3",
+          start: "top 65%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+    gsap.fromTo("#glowOverlay", 
+      { scaleX: 0 },
+      { 
+        scaleX: 1, duration: 1.4, ease: "power2.inOut",
+        scrollTrigger: {
+          trigger: "#sec-3",
+          start: "top 55%",
+          toggleActions: "play none none none"
+        }
+      }
+    );
+
+    // 4. 3D Space Focus
+    gsap.fromTo("#focusText", 
+      { opacity: 0, scale: 0.7, z: -800 },
+      { 
+        opacity: 1, scale: 1, z: 0, duration: 1.4, ease: "power2.out",
+        scrollTrigger: {
+          trigger: "#sec-4",
+          start: "top 60%",
+          end: "bottom 25%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // 5. Rejoicing Pulse Word Reveal
+    const pulseTextEl = document.getElementById("pulseText");
+    const pulseWords = pulseTextEl.textContent.trim().split(/\s+/);
+    pulseTextEl.innerHTML = "";
+    pulseWords.forEach(w => {
+      const span = document.createElement("span");
+      span.className = "pulse-word";
+      span.textContent = w;
+      pulseTextEl.appendChild(span);
+      pulseTextEl.appendChild(document.createTextNode(" ")); // Insert clean spaces to prevent word concatenation
+    });
+
+    gsap.fromTo("#pulseText .pulse-word", 
+      { opacity: 0, scale: 0.75, y: 15 },
+      {
+        opacity: 1, scale: 1, y: 0,
+        stagger: 0.07,
+        duration: 0.7,
+        ease: "back.out(1.5)",
+        scrollTrigger: {
+          trigger: "#sec-5",
+          start: "top 65%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // 6. Floating State of Desire words
+    const floatTextEl = document.getElementById("floatText");
+    const floatWords = floatTextEl.textContent.trim().split(/\s+/);
+    floatTextEl.innerHTML = "";
+    floatWords.forEach((w, idx) => {
+      const span = document.createElement("span");
+      span.className = "floating-word";
+      span.textContent = w;
+      span.style.setProperty('--i', idx);
+      floatTextEl.appendChild(span);
+      floatTextEl.appendChild(document.createTextNode(" ")); // Insert clean spaces to prevent word concatenation
+    });
+
+    gsap.fromTo("#floatText", 
+      { opacity: 0, y: 30 },
+      { 
+        opacity: 1, y: 0, duration: 1.2,
+        scrollTrigger: {
+          trigger: "#sec-6",
+          start: "top 60%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // 7. Pushing & Proving Text Reveal
+    gsap.fromTo("#pushText", 
+      { opacity: 0, scale: 0.95 },
+      { 
+        opacity: 1, scale: 1, duration: 1.2,
+        scrollTrigger: {
+          trigger: "#sec-7",
+          start: "top 60%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // 8. Reasons Text Reveal
+    gsap.fromTo("#reasonText", 
+      { opacity: 0, y: 20 },
+      { 
+        opacity: 1, y: 0, duration: 1.2,
+        scrollTrigger: {
+          trigger: "#sec-8",
+          start: "top 60%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // 9. Wisdom Golden Sweep Text Reveal
+    gsap.fromTo("#sweepText", 
+      { opacity: 0, y: 20 },
+      { 
+        opacity: 1, y: 0, duration: 1.2,
+        scrollTrigger: {
+          trigger: "#sec-9",
+          start: "top 60%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    gsap.fromTo(".golden-sweep-text", 
+      { backgroundPosition: "200% center" },
+      { 
+        backgroundPosition: "0% center", 
+        duration: 2.5, 
+        ease: "power1.inOut",
+        scrollTrigger: {
+          trigger: "#sec-9",
+          start: "top 55%",
+          toggleActions: "play none none none"
+        }
+      }
+    );
+
+    // --- HORIZONTAL PINNED GALLERY SECTION (S-O-N-I-A) ---
+    const hContainer = document.getElementById("horizontalContainer");
+    
+    gsap.to(hContainer, {
+      x: () => -(hContainer.scrollWidth - window.innerWidth),
+      ease: "none",
+      scrollTrigger: {
+        trigger: "#acronymTrigger",
+        pin: true,
+        scrub: 1,
+        start: "top top",
+        end: () => "+=" + (hContainer.scrollWidth - window.innerWidth),
+        invalidateOnRefresh: true
+      }
+    });
+
+    // --- POST-ACRONYM & INTERACTIVE QUESTIONS ---
+    gsap.fromTo("#epilogueText", 
+      { opacity: 0, y: 30 },
+      { 
+        opacity: 1, y: 0, duration: 1.2,
+        scrollTrigger: {
+          trigger: "#postAcronym",
+          start: "top 70%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    gsap.fromTo("#questionCard", 
+      { opacity: 0, scale: 0.96 },
+      { 
+        opacity: 1, scale: 1, duration: 1,
+        scrollTrigger: {
+          trigger: "#questionCard",
+          start: "top 75%",
+          toggleActions: "play reverse play reverse"
+        }
+      }
+    );
+
+    // Interactivity selection logic
+    const finalOverlay = document.getElementById('finalOverlay');
+    const finalMsg = document.getElementById('finalMsg');
+    const choiceButtons = document.querySelectorAll('.choice-btn');
+    const closeBtn = document.getElementById('closeOverlay');
+
+    const loveClosingText = "Franklin just discovered one of his purposes in life when he met you, and it is to make you happy.\n\nThis is just a little way for me to express my love.";
+
+    choiceButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Display response message (only your text about the purpose to make her happy)
+        finalMsg.textContent = loveClosingText;
+        finalOverlay.classList.add('active');
+        triggerMeteorShower();
+      });
+    });
+
+    closeBtn.addEventListener('click', () => {
+      finalOverlay.classList.remove('active');
+    });
+
+    // Hide scroll indicator on scroll
+    window.addEventListener('scroll', () => {
+      const scrollIndicator = document.getElementById('scrollIndicator');
+      if (window.scrollY > 80) {
+        scrollIndicator.style.opacity = '0';
+      } else {
+        scrollIndicator.style.opacity = '0.8';
+      }
+    });
+  </script>
+</body>
+</html>
