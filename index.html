@@ -1012,11 +1012,14 @@
     let isDragging = false;
     let dragStartX = 0;
     let dragStartScroll = 0;
-    let lastInteractionAt = 0;
+    
+    // Inertia & Momentum
+    let vx = 0;               // velocity in px/ms
+    let lastDragX = 0;
+    let lastDragTime = 0;
+    let isOffscreen = true;
 
-    const AUTO_SPEED = 0.6;        // px per ~60fps frame
-    const IDLE_RESUME_MS = 1800;   // ms of idle before auto resumes
-    const DRAG_LOOKAHEAD = 1;      // extra oneSetWidths of slack during drag
+    const AUTO_SPEED = 0.6;   // px per 16.67ms (approx 36px/s or 0.036px/ms)
 
     // Populate twice for seamless infinite loop
     const galleryCount = 18;
@@ -1040,60 +1043,82 @@
     }
 
     function applyTickerPosition() {
+      const setW = oneSetWidth();
+      if (setW > 0) {
+        // Seamlessly wrap position
+        while (tickerX <= -setW) {
+          tickerX += setW;
+        }
+        while (tickerX > 0) {
+          tickerX -= setW;
+        }
+      }
       tickerEl.style.transform = `translate3d(${tickerX}px, 0, 0)`;
     }
 
-    // Auto-scroll loop with seamless wrap + drag pause
+    // Auto-scroll loop with momentum and seamless wrapping
     let lastFrame = performance.now();
     function tickerLoop(now) {
       const dt = now - lastFrame;
       lastFrame = now;
 
-      if (!isDragging && (now - lastInteractionAt) > IDLE_RESUME_MS) {
-        const setW = oneSetWidth();
-        if (setW > 0) {
-          // Move left, normalized to 60fps baseline
-          tickerX -= AUTO_SPEED * (dt / 16.67);
-          // Seamless wrap when one full set has scrolled past
-          if (tickerX <= -setW) {
-            tickerX += setW;
-          }
-          applyTickerPosition();
+      if (!isOffscreen && !isDragging) {
+        // Steady-state auto scroll velocity (moving left)
+        const targetVx = -AUTO_SPEED / 16.67;
+        
+        // Decelerate pointer velocity back to target auto-scroll speed
+        if (Math.abs(vx - targetVx) > 0.001) {
+          vx += (targetVx - vx) * (1 - Math.exp(-0.004 * dt));
+        } else {
+          vx = targetVx;
         }
+        
+        tickerX += vx * dt;
+        applyTickerPosition();
       }
       requestAnimationFrame(tickerLoop);
-    }
-
-    function clampDuringDrag(x) {
-      const setW = oneSetWidth();
-      const minX = -(setW + (setW * DRAG_LOOKAHEAD * 0)); // allow one full extra set of slack
-      const maxX = 0;
-      if (x > maxX) return maxX;
-      if (x < minX) return minX;
-      return x;
     }
 
     function onDragStart(clientX) {
       isDragging = true;
       dragStartX = clientX;
       dragStartScroll = tickerX;
+      vx = 0;
+      lastDragX = clientX;
+      lastDragTime = performance.now();
       tickerEl.classList.add('dragging');
-      lastInteractionAt = performance.now();
     }
+
     function onDragMove(clientX) {
       if (!isDragging) return;
-      tickerX = clampDuringDrag(dragStartScroll + (clientX - dragStartX));
+      const now = performance.now();
+      const dt = now - lastDragTime;
+      
+      const deltaX = clientX - dragStartX;
+      tickerX = dragStartScroll + deltaX;
+      
+      if (dt > 0) {
+        // Calculate drag velocity (px/ms)
+        vx = (clientX - lastDragX) / dt;
+      }
+      
+      lastDragX = clientX;
+      lastDragTime = now;
       applyTickerPosition();
-      lastInteractionAt = performance.now();
     }
+
     function onDragEnd() {
       if (!isDragging) return;
       isDragging = false;
       tickerEl.classList.remove('dragging');
-      lastInteractionAt = performance.now();
+      
+      // Limit release velocity to keep animation graceful
+      const maxVx = 2.5; 
+      if (vx > maxVx) vx = maxVx;
+      if (vx < -maxVx) vx = -maxVx;
     }
 
-    // Mouse
+    // Mouse Events
     tickerEl.addEventListener('mousedown', (e) => {
       onDragStart(e.clientX);
       e.preventDefault();
@@ -1102,7 +1127,7 @@
     window.addEventListener('mouseup', onDragEnd);
     window.addEventListener('mouseleave', onDragEnd);
 
-    // Touch
+    // Touch Events
     tickerEl.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) onDragStart(e.touches[0].clientX);
     }, { passive: true });
@@ -1122,11 +1147,9 @@
     if (gallerySection) {
       const io = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
+          isOffscreen = !entry.isIntersecting;
           if (entry.isIntersecting) {
             lastFrame = performance.now();
-            lastInteractionAt = 0; // resume immediately when visible
-          } else {
-            lastInteractionAt = performance.now() + 1e9; // pause
           }
         });
       }, { threshold: 0.01 });
