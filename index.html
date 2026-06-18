@@ -331,6 +331,13 @@
       line-height: 1;
     }
 
+    /* Acronym keywords inside intro paragraph - match big card letter color */
+    .acronym-keyword {
+      color: var(--accent-gold);
+      font-weight: 500;
+      text-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
+    }
+
     .acronym-word {
       font-size: clamp(1.8rem, 5vw, 2.3rem);
       font-weight: 500;
@@ -575,7 +582,7 @@
           <div class="panel-intro" id="acronymIntro">
             <h2 class="panel-title">With Her...</h2>
             <p class="story-text">
-              With her smart mind and outstanding personality, her natural charm makes her truly irresistible and angelic.
+              With her <span class="acronym-keyword">smart</span> mind and <span class="acronym-keyword">outstanding</span> personality, her <span class="acronym-keyword">natural</span> charm makes her truly <span class="acronym-keyword">irresistible</span> and <span class="acronym-keyword">angelic</span>.
             </p>
           </div>
         </section>
