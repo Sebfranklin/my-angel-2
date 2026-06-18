@@ -72,9 +72,23 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      z-index: -1;
+      z-index: -2;
       pointer-events: none;
       background: radial-gradient(circle at 50% 50%, #030712 0%, #020617 100%);
+    }
+
+    /* Dynamic background ambient glow overlay */
+    .bg-overlay-glow {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 1.5s ease, background 1.5s ease;
+      will-change: opacity, background;
     }
 
     /* Scroll Indicator (Fades out when scrolling) */
@@ -96,6 +110,8 @@
       flex-direction: column;
       align-items: center;
       gap: 0.4rem;
+      transition: opacity 0.3s ease;
+      will-change: opacity;
     }
     
     .scroll-indicator::after {
@@ -134,7 +150,7 @@
     }
 
     .story-text {
-      font-family: var(--font-heading);
+      font-family: var(--font-sans);
       font-weight: 300;
       color: var(--text-muted);
       font-size: clamp(1.25rem, 3vw + 0.9rem, 1.85rem);
@@ -176,6 +192,10 @@
       display: inline-block;
       opacity: 0;
       transform: translate(var(--x, 0px), var(--y, 0px)) rotate(var(--r, 0deg));
+      text-shadow: 0 0 20px rgba(253, 164, 175, 0.9);
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
     }
 
     /* 3. Glow Burst background light */
@@ -212,11 +232,16 @@
 
     /* 8. Wisdom golden sweep text */
     .golden-sweep-text {
-      background: linear-gradient(to right, var(--text-muted) 20%, var(--accent-gold) 40%, var(--accent-gold) 60%, var(--text-muted) 80%);
+      background: linear-gradient(to right, #ffe4e6 20%, var(--accent-gold) 40%, var(--accent-rose) 60%, #ffe4e6 80%);
       background-size: 200% auto;
       color: transparent;
       -webkit-background-clip: text;
       background-clip: text;
+      text-shadow: 0 0 30px rgba(251, 191, 36, 0.15);
+      transition: text-shadow 0.5s ease;
+    }
+    .golden-sweep-text:hover {
+      text-shadow: 0 0 45px rgba(251, 191, 36, 0.45);
     }
 
     /* -------------------------------------------------------------
@@ -249,6 +274,8 @@
       position: relative;
       overflow: hidden;
       background: transparent; /* Keep background visible */
+      perspective: 1200px;
+      transform-style: preserve-3d;
     }
 
     .panel-intro {
@@ -278,21 +305,24 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
+      transform-style: preserve-3d;
+      will-change: transform;
+      transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
     }
 
     .acronym-card-bg {
       position: absolute;
       top: 0;
       left: 0;
-      width: 100%;
+      width: 116%; /* Added extra width to prevent border visibility during parallax */
       height: 100%;
       object-fit: cover;
       z-index: 1;
-      transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .acronym-card:hover .acronym-card-bg {
-      transform: scale(1.06);
+      will-change: transform;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
     }
 
     .acronym-card-overlay {
@@ -312,6 +342,7 @@
       flex-direction: column;
       padding: 1.8rem;
       text-align: left;
+      transform: translateZ(40px); /* Pushes content forward in 3D space */
     }
 
     .acronym-header {
@@ -378,6 +409,7 @@
       width: 100%;
       overflow: hidden;
       padding: 1rem 0;
+      perspective: 1200px;
     }
 
     .ticker {
@@ -388,6 +420,9 @@
       -webkit-user-select: none;
       touch-action: pan-y;
       will-change: transform;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform-style: preserve-3d;
     }
 
     .ticker.dragging {
@@ -403,9 +438,18 @@
       border: 1.5px solid rgba(255, 255, 255, 0.08);
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
       cursor: pointer;
-      transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
       position: relative;
       flex-shrink: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+      transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.4s ease, box-shadow 0.4s ease;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+
+    .gallery-card:hover {
+      border-color: rgba(244, 63, 94, 0.55);
+      box-shadow: 0 0 30px rgba(244, 63, 94, 0.35), 0 20px 40px rgba(0, 0, 0, 0.7);
     }
 
     .gallery-card::after {
@@ -486,6 +530,9 @@
 
   <!-- Background Space Canvas -->
   <canvas id="space-canvas"></canvas>
+
+  <!-- Ambient Glow Overlay -->
+  <div class="bg-overlay-glow" id="bgGlow"></div>
 
   <!-- Navigation indicator -->
   <div class="scroll-indicator" id="scrollIndicator">Scroll Journey</div>
@@ -690,6 +737,18 @@
     let stars = [];
     let shootingStars = [];
 
+    // Track mouse position globally for stars interaction
+    let mouseX = -1000;
+    let mouseY = -1000;
+    window.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+    window.addEventListener('mouseleave', () => {
+      mouseX = -1000;
+      mouseY = -1000;
+    });
+
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -733,9 +792,28 @@
         if (star.alpha > 1 || star.alpha < 0) {
           star.speed = -star.speed;
         }
+
+        // Parallax offset based on vertical scroll
+        const scrollOffset = window.scrollY * 0.12;
+        let drawY = (star.y - scrollOffset) % canvas.height;
+        if (drawY < 0) drawY += canvas.height;
+
+        let starX = star.x;
+        let starY = drawY;
+
+        // Interactive mouse repulsion
+        const dx = mouseX - starX;
+        const dy = mouseY - starY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          const force = (120 - dist) / 120;
+          starX -= (dx / dist) * force * 18;
+          starY -= (dy / dist) * force * 18;
+        }
+
         ctx.fillStyle = `rgba(248, 250, 252, ${star.alpha})`;
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.arc(starX, starY, star.radius, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -993,7 +1071,7 @@
     // --- HORIZONTAL PINNED GALLERY SECTION (S-O-N-I-A) ---
     const hContainer = document.getElementById("horizontalContainer");
     
-    gsap.to(hContainer, {
+    const hTween = gsap.to(hContainer, {
       x: () => -(hContainer.scrollWidth - window.innerWidth),
       ease: "none",
       scrollTrigger: {
@@ -1004,6 +1082,80 @@
         end: () => "+=" + (hContainer.scrollWidth - window.innerWidth),
         invalidateOnRefresh: true
       }
+    });
+
+    // Image Parallax on Horizontal Scroll
+    document.querySelectorAll('.acronym-card').forEach(card => {
+      const img = card.querySelector('.acronym-card-bg');
+      if (img) {
+        gsap.fromTo(img, 
+          { xPercent: -8 },
+          { 
+            xPercent: 8,
+            ease: "none",
+            scrollTrigger: {
+              trigger: card,
+              containerAnimation: hTween,
+              start: "left right",
+              end: "right left",
+              scrub: true
+            }
+          }
+        );
+      }
+    });
+
+    // Dynamic Ambient background glow color fades during horizontal scroll
+    const bgGlow = document.getElementById('bgGlow');
+    const panelGlows = [
+      'rgba(244, 63, 94, 0.08)',   // S (Rose/Pink)
+      'rgba(99, 102, 241, 0.08)',  // O (Indigo/Blue)
+      'rgba(34, 197, 94, 0.08)',   // N (Green)
+      'rgba(251, 191, 36, 0.08)',  // I (Gold/Yellow)
+      'rgba(244, 63, 94, 0.1)'     // A (Rose/Angelic)
+    ];
+
+    document.querySelectorAll('.panel').forEach((panel, idx) => {
+      if (idx > 0 && idx <= 5) { // Skip acronym intro panel (panel 0)
+        ScrollTrigger.create({
+          trigger: panel,
+          containerAnimation: hTween,
+          start: "left center",
+          end: "right center",
+          onEnter: () => {
+            bgGlow.style.background = `radial-gradient(circle at center, ${panelGlows[idx - 1]} 0%, transparent 75%)`;
+            bgGlow.style.opacity = 1;
+          },
+          onEnterBack: () => {
+            bgGlow.style.background = `radial-gradient(circle at center, ${panelGlows[idx - 1]} 0%, transparent 75%)`;
+            bgGlow.style.opacity = 1;
+          },
+          onLeave: () => {
+            if (idx === 5) bgGlow.style.opacity = 0;
+          },
+          onLeaveBack: () => {
+            if (idx === 1) bgGlow.style.opacity = 0;
+          }
+        });
+      }
+    });
+
+    // Interactive 3D Card Hover Tilt Effects
+    document.querySelectorAll('.acronym-card, .gallery-card').forEach(card => {
+      card.style.transformStyle = 'preserve-3d';
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const xc = rect.width / 2;
+        const yc = rect.height / 2;
+        const angleX = (yc - y) / 16;
+        const angleY = (x - xc) / 16;
+        card.style.transform = `translateY(-8px) rotateX(${angleX}deg) rotateY(${angleY}deg) scale(1.02)`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = 'translateY(0px) rotateX(0deg) rotateY(0deg) scale(1)';
+      });
     });
 
     // --- GEM GALLERY: AUTO-SCROLL + INTERACTIVE DRAG ---
@@ -1165,10 +1317,10 @@
     // Hide scroll indicator on scroll
     window.addEventListener('scroll', () => {
       const scrollIndicator = document.getElementById('scrollIndicator');
-      if (window.scrollY > 80) {
-        scrollIndicator.style.opacity = '0';
-      } else {
-        scrollIndicator.style.opacity = '0.8';
+      if (scrollIndicator) {
+        const opacity = Math.max(0, 0.8 - (window.scrollY / 150) * 0.8);
+        scrollIndicator.style.opacity = opacity;
+        scrollIndicator.style.pointerEvents = opacity === 0 ? 'none' : 'auto';
       }
     });
   </script>
